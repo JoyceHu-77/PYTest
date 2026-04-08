@@ -3,13 +3,14 @@
 # 启动：在项目根目录执行 docker compose up --build
 # =============================================================================
 
+# 可选：在与本文件同目录创建 .env，写入 POSTGRES_PASSWORD=你的强密码（勿提交 git）
 services:
   # PostgreSQL：数据持久化在命名卷 pgdata；本机可用 localhost:5432 连接（便于本机 uvicorn 调试）。
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: app
-      POSTGRES_PASSWORD: appsecret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-appsecret}
       POSTGRES_DB: appdb
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -28,7 +29,7 @@ services:
     restart: unless-stopped
     environment:
       # 在 compose 网络内，主机名 db 解析到数据库容器（不要用 localhost，那会指向 api 容器自己）。
-      DATABASE_URL: postgresql://app:appsecret@db:5432/appdb
+      DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD:-appsecret}@db:5432/appdb
     depends_on:
       db:
         condition: service_healthy
