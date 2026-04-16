@@ -3,24 +3,26 @@
 # 启动：在项目根目录执行 docker compose up --build
 # =============================================================================
 
-# 可选：在与本文件同目录创建 .env，写入 POSTGRES_PASSWORD=你的强密码（勿提交 git）
+# 可选：在与本文件同目录创建 .env，写入 POSTGRES_PASSWORD=你的强密码（与 MySQL 共用，勿提交 git）
 services:
-  # PostgreSQL：数据持久化在命名卷 pgdata；本机可用 localhost:5432 连接（便于本机 uvicorn 调试）。
   db:
-    image: postgres:16-alpine
+    image: mysql:5.7
     environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-appsecret}
-      POSTGRES_DB: appdb
+      MYSQL_ROOT_PASSWORD: ${POSTGRES_PASSWORD:-appsecret}
+      MYSQL_DATABASE: appdb
+      MYSQL_USER: app
+      MYSQL_PASSWORD: ${POSTGRES_PASSWORD:-appsecret}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mysqldata:/var/lib/mysql
     ports:
-      - "5432:5432"
+      - "3306:3306"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d appdb"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 30
+      start_period: 40s
 
   api:
     build: .
@@ -28,11 +30,10 @@ services:
       - "8000:8000"
     restart: unless-stopped
     environment:
-      # 在 compose 网络内，主机名 db 解析到数据库容器（不要用 localhost，那会指向 api 容器自己）。
-      DATABASE_URL: postgresql://app:${POSTGRES_PASSWORD:-appsecret}@db:5432/appdb
+      DATABASE_URL: mysql+pymysql://app:${POSTGRES_PASSWORD:-appsecret}@db:3306/appdb?charset=utf8mb4
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
-  pgdata:
+  mysqldata:
